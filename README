@@ -1,0 +1,3 @@
+1. mkdir CMakeFiles; cd CMakeFiles; cmake ..
+2. make
+3. cd examples; bash run.sh -or- bash run_newminos.sh -or- bash run_contour.sh
