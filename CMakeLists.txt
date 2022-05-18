@@ -27,6 +27,9 @@ target_link_libraries(Contour PUBLIC Base)
 add_library(Fitter SHARED src/Fitter.cpp)
 target_link_libraries(Fitter PUBLIC ROOT::MathCore Base Contour)
 
+add_executable(minimize_test src/Minimize_Test.cxx)
+target_link_libraries(minimize_test PUBLIC Fitter ROOT::RIO ROOT::Tree)
+
 add_executable(cont_test src/Contour_Test.cxx)
 target_link_libraries(cont_test PUBLIC Fitter Base ROOT::RIO ROOT::MathCore ROOT::Tree ROOT::Hist ROOT::Gpad)
 

@@ -46,78 +46,116 @@ void Chi2_Fitter::ReSet(){
     _para_central.ReSet();
     _para_limits.clear(); 
 }
-/*
+
 void Chi2_Fitter::Minimize() {
     int zerocounter;  //counts the number of accept zero of Chi2_Gradient
     int const_mu = 2;
     int NRES = _para_central.GetNRes();
-
-    for (int circounter = 0; circounter <= 100; circounter++) {  //Converge to the desired precison within 100 times.
-        for (zerocounter = 0; zerocounter < 4 * NRES - 1; zerocounter++)
-            if ((isnan((*_chi2_gradient_reduced)[zerocounter][0]) || isinf((*_chi2_gradient_reduced)[zerocounter][0])) == 1) return;        //Failure or error to converge.
-        for (zerocounter = 0; zerocounter < 4 * NRES - 1; zerocounter++)
-            if (abs((*_chi2_gradient_reduced)[zerocounter][0]) > 10E-5) break;
-        if (zerocounter == 4 * NRES - 1) return;    //Sufficient accuracy!
-
-        ResFit::Chi2 tmp_chi2_lamda, tmp_chi2_lamda_mu;
-        ParameterUpdateCal(&tmp_chi2_lamda, _lambda);
-        ParameterUpdateCal(&tmp_chi2_lamda_mu, _lambda / const_mu);
-        if (tmp_chi2_lamda.GetChi2() <= this->GetChi2()) {
-            if (tmp_chi2_lamda_mu.GetChi2() <= this->GetChi2()) {
-                UpdateParameter(tmp_chi2_lamda_mu.GetResonance());
-                _lambda = _lambda / const_mu;
-            }
-            else UpdateParameter(tmp_chi2_lamda.GetResonance());
-        }
-        else _lambda = _lambda * const_mu;
+    double lambda = _lambda;
+    this->ReSet();
+    this->UpdateHess();
+    TMatrixD * chi2_gradient_reduced = _para_central.GetChi2Gradient_Reduced();
+/*
+    std::map<std::string, ResFit::resonance> res_init = _para_central.GetResonance();
+    for(std::map<std::string, ResFit::resonance>::iterator itr = res_init.begin(); itr!=res_init.end();++itr){
+           std::cout<<itr->first<<"\t"<<(itr->second)[Mass]<<"\t"<<(itr->second)[Width]<<"\t"<<(itr->second)[Phase]<<"\t"<<(itr->second)[Branchratio]<<std::endl;
     }
+*/    
+    for (int circounter = 0; circounter <= 10; circounter++) {  //Converge to the desired precison within 100 times.
+        chi2_gradient_reduced = _para_central.GetChi2Gradient_Reduced();
+        for (zerocounter = 0; zerocounter < 4 * NRES - 1; zerocounter++)
+            if ((isnan((*chi2_gradient_reduced)[zerocounter][0]) || isinf((*chi2_gradient_reduced)[zerocounter][0])) == 1) return;        //Failure or error to converge.
+        for (zerocounter = 0; zerocounter < 4 * NRES - 1; zerocounter++)
+            if (abs((*chi2_gradient_reduced)[zerocounter][0]) > 10E-5) break;
+        if (zerocounter == 4 * NRES - 1) return;    //Sufficient accuracy!
+        ResFit::Chi2 tmp_chi2_lamda, tmp_chi2_lamda_mu;
+        ParameterUpdateCal(tmp_chi2_lamda, lambda);
+        ParameterUpdateCal(tmp_chi2_lamda_mu, lambda / const_mu);
+        std::map<std::string,ResFit::resonance> v_res_tmp_chi2_lamda_mu = tmp_chi2_lamda_mu.GetResonance();
+        std::map<std::string,ResFit::resonance> v_res_tmp_chi2_lamda = tmp_chi2_lamda.GetResonance();
+        if (tmp_chi2_lamda.GetChi2() <= _para_central.GetChi2()) {
+            if (tmp_chi2_lamda_mu.GetChi2() <= _para_central.GetChi2()) {
+                UpdateParameter(v_res_tmp_chi2_lamda_mu);
+                lambda = lambda / const_mu;
+            }
+            else UpdateParameter(v_res_tmp_chi2_lamda);
+        }
+        else lambda = lambda * const_mu;
+    }
+//    std::for_each(_data.begin(),_data.end(), std::ref(_para_central));
+//    this->UpdateHess();
 }
 
-void Chi2_Fitter::UpdateParameter(std::map<std::string, ResFit::resonance> changed_res) {
+void Chi2_Fitter::UpdateParameter(std::map<std::string, ResFit::resonance>  changed_res) {
+    int NRES = changed_res.size();
+/*
     for (int i = 0; i < NRES; i++) {
         ResFit::resonance tmp;
-        string resname("res_");
-        resname.append(to_string(i));
+        std::string resname("res_");
+        resname.append(std::to_string(i));
         _para_central.UpdateRes(resname, changed_res[resname]);
     }
-    _para_central.FixPhaseAngle();
+*/
+    for(std::map<std::string, ResFit::resonance>::iterator itr = changed_res.begin(); itr!=changed_res.end();++itr){
+        _para_central.UpdateRes(itr->first, changed_res[itr->first]);
+    }
+
+//    _para_central.FixPhaseAngle();
+/*
     _para_central.ReSet();
-    for_each(v_data.begin(),v_data.end(),ref(_para_central));
+    std::for_each(_data.begin(),_data.end(),std::ref(_para_central));
+    _para_central.SetCovariance();
+*/
+    this->UpdateHess();
 }
 
-void Chi2_Fitter::ParameterUpdateCal(ResFit::Chi2 _tmp_chi2, double lamda_mu) {
+void Chi2_Fitter::ParameterUpdateCal(ResFit::Chi2 & _tmp_chi2, double lamda_mu) {
     int NRES = _para_central.GetNRes();
     TMatrixD calculateMatrix(4 * NRES - 1, 4 * NRES - 1);
+    TMatrixD * chi2_hess_reduced =_para_central.GetHess_Reduced() ;
+    TMatrixD * chi2_gradient_reduced = _para_central.GetChi2Gradient_Reduced();
     for (int i = 0; i < 4 * NRES - 1; i++) {
         for (int j = 0; j < 4 * NRES - 1; j++) {
-            calculateMatrix[i][j] = (*_chi2_hess_reduced)[i][j] + lamda_mu * (i == j);      //i==j stand for IdentityMatrix
+            calculateMatrix[i][j] = (*chi2_hess_reduced)[i][j] + lamda_mu * (i == j);      //i==j stand for IdentityMatrix
         }
     }
     calculateMatrix.Invert();
 
     TMatrixD parameter_matrix(4 * NRES, 1);
-    TMatrixD tmp_parameter_matrix = calculate_Matrix * _para_central.GetChi2Gradient_Reduced();
+    TMatrixD tmp_parameter_matrix = calculateMatrix * (*chi2_gradient_reduced);
     for (int i = 0; i < 4 * NRES; i++) {
         if (i == 2) parameter_matrix[2][0] = 0.;
         else parameter_matrix[i][0] = tmp_parameter_matrix[i - (i >= 2)][0];
     }
 
     std::map<std::string, ResFit::resonance> _variable_res = _para_central.GetResonance();
+/*
     for (int i = 0; i < NRES; i++) {
         ResFit::resonance tmp;
-        string resname("res_");
-        resname.append(to_string(i));
-        tmp.mass = _variable_res[resname]._mass - parameter_matrix[4 * i][0];
-        tmp.width = _variable_res[resname]._width - parameter_matrix[4 * i + 1][0];
-        tmp.phase = _variable_res[resname]._phase - parameter_matrix[4 * i + 2][0];
-        tmp.branchratio = _variable_res[resname]._branchratio - parameter_matrix[4 * i + 3][0];
+        std::string resname("res_");
+        resname.append(std::to_string(i));
+        tmp._mass = _variable_res[resname]._mass - parameter_matrix[4 * i][0];
+        tmp._width = _variable_res[resname]._width - parameter_matrix[4 * i + 1][0];
+        tmp._phase = _variable_res[resname]._phase - parameter_matrix[4 * i + 2][0];
+        tmp._branchratio = _variable_res[resname]._branchratio - parameter_matrix[4 * i + 3][0];
         _tmp_chi2.AddRes(resname, tmp);
     }
-    _tmp_chi2.FixPhaseAngle(this->GetCentral()->GetFixedPhaseRes());
-    _tmp_chi2.ReSet();
-    for_each(v_data.begin(), v_data.end(), _tmp_chi2);
-}
 */
+    int res_counter = 0;
+    for(std::map<std::string, ResFit::resonance>::iterator itr = _variable_res.begin(); itr!=_variable_res.end();++itr){
+        ResFit::resonance tmp;
+        tmp._mass = _variable_res[itr->first]._mass - parameter_matrix[4 * res_counter][0];
+        tmp._width = _variable_res[itr->first]._width - parameter_matrix[4 * res_counter + 1][0];
+        tmp._phase = _variable_res[itr->first]._phase - parameter_matrix[4 * res_counter + 2][0];
+        tmp._branchratio = _variable_res[itr->first]._branchratio - parameter_matrix[4 * res_counter + 3][0];
+        _tmp_chi2.AddRes(itr->first,tmp);
+        res_counter+=1;
+    }
+    _tmp_chi2.FixPhaseAngle(_para_central.GetFixedPhaseRes());
+    _tmp_chi2.ReSet();
+    std::for_each(_data.begin(), _data.end(), std::ref(_tmp_chi2));
+}
+
 void Chi2_Fitter::UpdateHess(){
     _para_central.ReSet();
     for_each(_data.begin(),_data.end(),std::ref(_para_central));

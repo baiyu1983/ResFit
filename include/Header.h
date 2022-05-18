@@ -160,12 +160,13 @@ class Chi2_Fitter{
        Chi2_Hess _para_central;  //Including central value of parameters, and hessian matrix. It will be updated in minimization
        std::map<std::pair<std::string, ResFit::respara>,Chi2_Hess>  _para_limits;
        int _nfp; // number of points to plot contour
+       double _lambda;
        double _error_definition;   //Error Definition, default value is 1
        double _converge_criteria; //Ratio of update comparing to error
  //      std::map<std::pair<std::pair<std::string, ResFit::respara>,std::pair<std::string, ResFit::respara> >,Contour> _contour;
        std::vector<Bdata> _data;
     public:
-       Chi2_Fitter():_nfp(200),_error_definition(1.0),_converge_criteria(1.0E-5),_data(std::vector<Bdata>(0)),_para_central(ResFit::Chi2_Hess()),_para_limits(std::map<std::pair<std::string,ResFit::respara>,ResFit::Chi2_Hess>()){}
+       Chi2_Fitter():_nfp(200),_lambda(0.01),_error_definition(1.0),_converge_criteria(1.0E-5),_data(std::vector<Bdata>(0)),_para_central(ResFit::Chi2_Hess()),_para_limits(std::map<std::pair<std::string,ResFit::respara>,ResFit::Chi2_Hess>()){}
        ~Chi2_Fitter(){}
        void AddData(Bdata);
 //       void DelData(Delet Criteria);
@@ -175,12 +176,13 @@ class Chi2_Fitter{
        void SetErrorDef(double x){_error_definition = x;}
        void SetPrecision(double x){_converge_criteria = x;}
        void SetNFP(int n){_nfp = n;}
+       void SetLambda(double l){_lambda = l;}
        void ReSet();
-/*
+
        void Minimize();
        void UpdateParameter(std::map<std::string, ResFit::resonance> changed_res);
-       void ParameterUpdateCal(ResFit::Chi2 _tmp_chi2, double lamda_mu);
-*/
+       void ParameterUpdateCal(ResFit::Chi2 & tmp_chi2, double lamda_mu);
+
        void UpdateHess();  //Update Hessian matrix of central value
        void InitialMinos(std::string, ResFit::respara, bool updatehess=true, double Delta=1.0);   //Initialize for one parameter
 //       void InitialMinos(std::string, std::String, ResFit::respara, ResFit::respara, bool updatehess=true); //
@@ -200,6 +202,8 @@ class Chi2_Fitter{
        double GetPrecision() const{return _converge_criteria;}
        double GetNFP() const{return _nfp;}
        double GetChi2Min() const{return _para_central.GetChi2();}
+       double GetLambda() const{return _lambda;}
+       TMatrixD* GetGradient_Reduced() const{return _para_central.GetChi2Gradient_Reduced();}
        TMatrixD* GetHess() const{return _para_central.GetHess();}
        TMatrixD* GetHess_Reduced() const{return _para_central.GetHess_Reduced();}
        TMatrixD* GetCovariance() const{return _para_central.GetCovariance();}
